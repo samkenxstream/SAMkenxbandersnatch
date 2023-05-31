@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest.mock as mock
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from _pytest.capture import CaptureFixture
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from bandersnatch.mirror import BandersnatchMirror
 
 
-async def empty_dict(*args: Any, **kwargs: Any) -> Dict:
+async def empty_dict(*args: Any, **kwargs: Any) -> dict:
     return {}
 
 
@@ -128,7 +128,7 @@ def test_main_throws_exception_on_unsupported_digest_name(
     with pytest.raises(ValueError) as e:
         main(asyncio.new_event_loop())
 
-    assert "foobar is not supported" in str(e.value)
+    assert "foobar is not a valid" in str(e.value)
 
 
 @pytest.fixture

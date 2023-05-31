@@ -5,9 +5,9 @@ import configparser
 import importlib.resources
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, Type
+from typing import Any, NamedTuple
 
-from .simple import SimpleFormat, get_format_value
+from .simple import SimpleDigest, SimpleFormat, get_digest_value, get_format_value
 
 logger = logging.getLogger("bandersnatch")
 
@@ -28,9 +28,9 @@ class SetConfigValues(NamedTuple):
 
 
 class Singleton(type):  # pragma: no cover
-    _instances: Dict["Singleton", Type] = {}
+    _instances: dict["Singleton", type] = {}
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> Type:
+    def __call__(cls, *args: Any, **kwargs: Any) -> type:
         if cls not in cls._instances:
             cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]
@@ -40,7 +40,7 @@ class BandersnatchConfig(metaclass=Singleton):
     # Ensure we only show the deprecations once
     SHOWN_DEPRECATIONS = False
 
-    def __init__(self, config_file: Optional[str] = None) -> None:
+    def __init__(self, config_file: str | None = None) -> None:
         """
         Bandersnatch configuration class singleton
 
@@ -52,9 +52,10 @@ class BandersnatchConfig(metaclass=Singleton):
         config_file: str, optional
             Path to the configuration file to use
         """
-        self.found_deprecations: List[str] = []
-        with importlib.resources.path("bandersnatch", "default.conf") as config_path:
-            self.default_config_file = str(config_path)
+        self.found_deprecations: list[str] = []
+        self.default_config_file = str(
+            importlib.resources.files("bandersnatch") / "default.conf"
+        )
         self.config_file = config_file
         self.load_configuration()
         # Keeping for future deprecations ... Commenting to save function call etc.
@@ -131,15 +132,17 @@ def validate_config_values(  # noqa: C901
     logger.info(f"Selected storage backend: {storage_backend_name}")
 
     try:
-        digest_name = config.get("mirror", "digest_name")
+        digest_name = get_digest_value(config.get("mirror", "digest_name"))
     except configparser.NoOptionError:
-        digest_name = "sha256"
-    if digest_name not in ("md5", "sha256"):
-        raise ValueError(
-            f"Supplied digest_name {digest_name} is not supported! Please "
-            + "update digest_name to one of ('sha256', 'md5') in the [mirror] "
-            + "section."
+        digest_name = SimpleDigest.SHA256
+        logger.debug(f"Using digest {digest_name} by default ...")
+    except ValueError as e:
+        logger.error(
+            f"Supplied digest_name {config.get('mirror', 'digest_name')} is "
+            + "not supported! Please update the digest_name in the [mirror] "
+            + "section of your config to a supported digest value."
         )
+        raise e
 
     try:
         cleanup = config.getboolean("mirror", "cleanup")
